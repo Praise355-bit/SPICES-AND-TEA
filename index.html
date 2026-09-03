@@ -84,7 +84,8 @@
             text-decoration: none;
         }
 
-        .category-nav-wrapper {
+        /* Search & Sticky Header Controls */
+        .controls-wrapper {
             position: sticky;
             top: 0;
             background-color: rgba(13, 12, 10, 0.85);
@@ -95,12 +96,68 @@
             padding: 12px 0;
         }
 
+        .search-container {
+            max-width: 640px;
+            margin: 0 auto 10px;
+            padding: 0 20px;
+            position: relative;
+        }
+
+        .search-input-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-input-wrap span.search-icon {
+            position: absolute;
+            left: 14px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .search-input {
+            width: 100%;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 10px 36px 10px 38px;
+            border-radius: var(--radius-lg);
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 0 3px rgba(229, 193, 88, 0.15);
+        }
+
+        .clear-search-btn {
+            position: absolute;
+            right: 12px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            cursor: pointer;
+            display: none;
+            padding: 2px;
+        }
+
+        .clear-search-btn.visible {
+            display: block;
+        }
+
         .category-nav {
             display: flex;
             gap: 8px;
             overflow-x: auto;
             padding: 0 20px;
             scrollbar-width: none;
+            max-width: 680px;
+            margin: 0 auto;
         }
 
         .category-nav::-webkit-scrollbar {
@@ -164,6 +221,10 @@
             transition: border-color 0.2s ease;
         }
 
+        .menu-item.search-hidden {
+            display: none !important;
+        }
+
         .menu-item:hover {
             border-color: rgba(229, 193, 88, 0.4);
         }
@@ -190,6 +251,22 @@
             color: var(--accent-gold);
             font-weight: 600;
             font-size: 0.9rem;
+        }
+
+        .no-results {
+            display: none;
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+        }
+
+        .no-results.visible {
+            display: block;
+        }
+
+        .no-results p {
+            font-size: 0.9rem;
+            margin-top: 8px;
         }
 
         .add-btn {
@@ -370,7 +447,15 @@
         </div>
     </header>
 
-    <div class="category-nav-wrapper">
+    <div class="controls-wrapper">
+        <div class="search-container">
+            <div class="search-input-wrap">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="search-input" class="search-input" placeholder="Search menu items (e.g., Matcha, Suya, Pie)..." autocomplete="off">
+                <button id="clear-search" class="clear-search-btn">&times;</button>
+            </div>
+        </div>
+
         <div class="category-nav">
             <button class="category-btn active" data-target="teas-drinks">Teas &amp; Drinks (20)</button>
             <button class="category-btn" data-target="meals-grills">Meals &amp; Grills (20)</button>
@@ -379,6 +464,11 @@
     </div>
 
     <div class="menu-container">
+
+        <div id="no-results" class="no-results">
+            🔍 
+            <p>No items found matching your search.</p>
+        </div>
 
         <!-- TEAS & DRINKS (20 ITEMS) -->
         <div class="menu-section active" id="teas-drinks">
@@ -452,7 +542,7 @@
                 <div class="item-info"><h3>Iced Brown Sugar Oat Latte</h3><p>Espresso, dark brown sugar, cinnamon &amp; creamy oat milk</p><div class="item-price">₦4,800</div></div>
                 <div class="item-action"></div>
             </div>
-            <div class="menu-item" data-name=" Lemongrass Ginger Tonic" data-price="3400">
+            <div class="menu-item" data-name="Lemongrass Ginger Tonic" data-price="3400">
                 <div class="item-info"><h3>Lemongrass Ginger Tonic</h3><p>Steeped fresh lemongrass stalks with ginger &amp; sparkling water</p><div class="item-price">₦3,400</div></div>
                 <div class="item-action"></div>
             </div>
@@ -680,10 +770,80 @@
             btn.addEventListener('click', () => {
                 categoryBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                document.querySelectorAll('.menu-section').forEach(s => s.classList.remove('active'));
-                document.getElementById(btn.dataset.target).classList.add('active');
+                
+                // Clear search input when changing categories for clean view
+                const searchInput = document.getElementById('search-input');
+                if (searchInput.value) {
+                    searchInput.value = '';
+                    filterMenuItems('');
+                } else {
+                    switchSection(btn.dataset.target);
+                }
             });
         });
+
+        function switchSection(targetId) {
+            document.querySelectorAll('.menu-section').forEach(s => s.classList.remove('active'));
+            const targetSection = document.getElementById(targetId);
+            if (targetSection) {
+                targetSection.classList.add('active');
+            }
+        }
+
+        // Real-Time Search Logic
+        const searchInput = document.getElementById('search-input');
+        const clearSearchBtn = document.getElementById('clear-search');
+        const noResultsMsg = document.getElementById('no-results');
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            filterMenuItems(query);
+        });
+
+        clearSearchBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            filterMenuItems('');
+            searchInput.focus();
+        });
+
+        function filterMenuItems(query) {
+            clearSearchBtn.classList.toggle('visible', query.length > 0);
+            let totalMatches = 0;
+
+            if (query === '') {
+                // Reset state: hide all item overrides and restore selected category view
+                document.querySelectorAll('.menu-item').forEach(item => {
+                    item.classList.remove('search-hidden');
+                });
+                noResultsMsg.classList.remove('visible');
+
+                const activeTab = document.querySelector('.category-btn.active');
+                if (activeTab) {
+                    switchSection(activeTab.dataset.target);
+                }
+                return;
+            }
+
+            // Show all sections during active search query
+            document.querySelectorAll('.menu-section').forEach(section => {
+                section.classList.add('active');
+            });
+
+            document.querySelectorAll('.menu-item').forEach(item => {
+                const name = item.dataset.name.toLowerCase();
+                const desc = item.querySelector('p').textContent.toLowerCase();
+
+                if (name.includes(query) || desc.includes(query)) {
+                    item.classList.remove('search-hidden');
+                    totalMatches++;
+                } else {
+                    item.classList.add('search-hidden');
+                }
+            });
+
+            // Toggle no results state
+            noResultsMsg.classList.toggle('visible', totalMatches === 0);
+        }
 
         // Cart Actions
         function renderItemControls() {
